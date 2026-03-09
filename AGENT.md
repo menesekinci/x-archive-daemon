@@ -1,0 +1,87 @@
+# X Archive Agent Rules
+
+Bu projede tool'lar iki risk grubuna ayrilir:
+
+- `safe-read`
+  - yerel arama, listeleme ve uzak hesap cozumu
+  - kullanici onayi gerektirmez
+- `operator-write`
+  - X API'den veri cekip yerel SQLite arsivine yazar
+  - X tarafinda canli veri degistirmez
+  - yine de dis kaynak tuketimi ve yerel state degisimi oldugu icin ajan ne yapacagini acikca yazmali
+
+Kurallar:
+- X tarafinda post olusturma, silme, begenme, reply, DM gibi bir islem yoktur
+- `ingest.*` tool'lari calistirmadan once hangi hesaptan ne kadar veri cekilecegi acikca belirtilmelidir
+- analiz katmani varsayilan olarak kapali kabul edilir:
+  - kullanici sadece veri toplamak istiyorsa `analysis.*` calistirma
+  - kullanici akilli arama, ogretici icerik bulma veya etiketleme isterse analiz araclarini oner
+- `ingest.accounts.backfill`, `ingest.accounts.original_backfill` ve `ingest.search.backfill` icin varsayilan guvenli akis:
+  - once `estimateOnly: true`
+  - sonra beklenen hacim ve maliyeti kullaniciya yaz
+  - acik onay gelirse gercek ingest calistir
+  - arac `cacheHit: true` donerse ayni kapsami tekrar cekmeye zorlama
+  - kullanici daha fazla veri isterse `missingCount` ve `fetchStrategy` alanlarini esas al
+- kullanici "tweetleri cek", "postlari topla", "arsive al" gibi genel bir ifade kullaniyorsa:
+  - varsayilan olarak `ingest.accounts.original_backfill` tercih et
+  - ancak kullanici acikca reply, retweet, quote tweet veya tam timeline isterse `ingest.accounts.backfill` kullan
+- `ingest.accounts.original_backfill` reply, retweet ve quote tweetleri query seviyesinde disarida birakir
+- `latest N` ve tarih araligi ayni sey degildir:
+  - eski bir window backfill'i `latest` isteginin yerine sayilmaz
+  - exact ayni window/query tekrarlandiginda local-first davranis beklenir
+- read-only bir cevap yeterliyse `archive.*` veya `sources.accounts.resolve` tercih edilmelidir
+- semantik arama kullanmadan once `archive.insights.summary` veya `archive.posts.semantic_search` sonucundan analiz var mi kontrol et
+- analiz yoksa:
+  - "mevcut arsiv analiz edilmemis, isterse simdi analysis.posts.run calistirabilirim" diye acikca belirt
+  - kullanici onayi olmadan analiz baslatma
+- `analysis.posts.run`
+  - yalnizca yerel arsivi isler
+  - X kredisi tuketmez
+  - yine de SQLite'a yazar ve CPU kullanir
+  - varsayilan guvenli akis:
+    - once hangi hesap/aralik analiz edilecegini yaz
+    - sonra kullanici onayi varsa calistir
+- `analysis.labels.list`
+  - etiket sozlugunu ve anlamlarini gostermek icin kullanilir
+- `archive.posts.semantic_search`
+  - yalnizca analiz edilmis postlarda calisir
+  - kullanici genis bir bilgi istegi verdiginde once bu aracla dar aday kumesi cikar
+  - sonra ajan sadece bu adaylar uzerinden cevap sentezler
+- `archive.insights.summary`
+  - analiz kapsami, ogretici oran ve baskin etiketleri gormek icin kullan
+- `full_archive` kullaniminda hesap erisimi yoksa araci zorlamaya devam etme; bunu acik hata olarak bildir
+- MCP katmaninda daemon kapaliysa otomatik baslatma deneme
+- `DAEMON_UNAVAILABLE` durumunda kullaniciya daemon'in ayri surec oldugu ve once onun acilmasi gerektigi net yazilmali
+- kullanici ozellikle isterse veya akisi acikca gerektiriyorsa `system.daemon.start` kullanilabilir
+- `system.daemon.start` yerel surec baslatir; bu nedenle sadece daemon'in kapali oldugu netse veya kullanici acikca istediyse cagir
+- MCP text sonucunda meta alanlari gizleme:
+  - `estimateOnly`
+  - `writePerformed`
+  - `requestsCount`
+  - `postsConsumed`
+  - `estimatedCostUsd`
+  - `cacheHit`
+  - `remoteFetchNeeded`
+  - `localMatchedCount`
+  - `missingCount`
+  - `fetchStrategy`
+  - `coverageScope`
+  gorunur kalmali ki ajan maliyet ve etkiyi anlayabilsin
+- `archive.posts.*` sonucunda `mediaUrls` varsa bunlari koru:
+  - URL'ler gorselin kendisi degil
+  - sadece posta bagli medya referansidir
+- `archive.accounts.get` sonucundaki `coverage.scopes` alanini yorumla:
+  - hangi tarih araliginda hangi tip verinin cekildigini buradan anlarsin
+  - `contentType: original_posts` ise ozgun paylasim kapsami vardir
+  - `contentType: all_posts` ise reply/retweet/quote dahil genel timeline kapsami vardir
+  - `requestMode: window` ise belirli tarih araligi istegidir
+  - `requestMode: latest` ise "son N" mantigiyla olusmus kapsamdir
+- kullanici maliyet sorarsa:
+  - `archive.billing.summary` kullan
+  - bu tool yerel tahmini maliyeti, son kosulari ve hesap bazli kirilimi doner
+  - resmi kalan kredi bakiyesi degil, daemon'in tuttugu yerel kullanim ozetidir
+- kullanici ogretici teknik bilgi isterse varsayilan akisin:
+  - `archive.insights.summary`
+  - gerekirse `analysis.posts.run`
+  - sonra `archive.posts.semantic_search`
+  - en sonda yalnizca donen kucuk aday kume ustunden sentez

@@ -1,0 +1,25 @@
+{
+  "name": "x-archive-daemon",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "daemon:start": "node build/src/daemon.js",
+    "daemon:dev": "tsx src/daemon.ts",
+    "mcp:start": "node build/src/index.js",
+    "mcp:dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test tests/**/*.test.ts"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
+    "@modelcontextprotocol/sdk": "^1.18.1",
+    "@xdevplatform/xdk": "^0.4.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.2"
+  }
+}

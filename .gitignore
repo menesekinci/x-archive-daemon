@@ -1,0 +1,8 @@
+node_modules
+build
+.secrets/*.json
+.artifacts/**
+.data/**
+.models/**
+!.artifacts/.gitkeep
+!.data/.gitkeep
